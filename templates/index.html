@@ -1,0 +1,185 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pest Detection Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            background-image: url('https://www.transparenttextures.com/patterns/green-leaves.png');
+            background-size: cover;
+        }
+        .container {
+            display: flex;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .alerts {
+            width: 30%;
+        }
+        .alert {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            padding: 10px;
+            cursor: pointer;
+            position: relative;
+        }
+        .alert:hover {
+            background-color: #f9f9f9;
+        }
+        .alert-details {
+            display: none;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .main-content {
+            width: 65%;
+        }
+        .welcome {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .welcome-sub {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .graph {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 20px;
+        }
+        .upload-section {
+            margin-top: 20px;
+        }
+        .upload-section input {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="alerts">
+            <h2>Alerts</h2>
+            {% for alert in alerts %}
+            <div class="alert" onclick="toggleDetails(this)">
+                ALERT {{ alert.id }} <i class="fas fa-chevron-down"></i>
+                <div class="alert-details">{{ alert.message }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="main-content">
+            <div class="welcome">Welcome Mr. Farmer</div>
+            <div class="welcome-sub">Let's see how your field is doing today!</div>
+            <div class="graph">
+                <canvas id="pestGraph"></canvas>
+            </div>
+            <div class="upload-section">
+                <input type="file" id="imageUpload" accept="image/*">
+                <button onclick="uploadImage()">Upload Image</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize the graph
+        const pestCounts = JSON.parse('{{ pest_counts | tojson | safe }}');
+        const ctx = document.getElementById('pestGraph').getContext('2d');
+        const pestGraph = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Army Worm', 'Black Cut Worm', 'Grub', 'Mole Cricket', 'Peach Borer', 'Red Spider Mite'],
+                datasets: [{
+                    label: 'Infestation Count',
+                    data: [
+                        pestCounts[1] || 0,
+                        pestCounts[2] || 0,
+                        pestCounts[3] || 0,
+                        pestCounts[4] || 0,
+                        pestCounts[5] || 0,
+                        pestCounts[6] || 0
+                    ],
+                    borderColor: '#00b7eb',
+                    fill: false
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 50
+                    }
+                }
+            }
+        });
+
+        // Toggle alert details
+        function toggleDetails(element) {
+            const details = element.querySelector('.alert-details');
+            details.style.display = details.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Upload image and update UI
+        function uploadImage() {
+            const fileInput = document.getElementById('imageUpload');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select an image to upload.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Update alerts
+                const alertsDiv = document.querySelector('.alerts');
+                alertsDiv.innerHTML = '<h2>Alerts</h2>';
+                data.alerts.forEach(alert => {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert';
+                    alertDiv.onclick = function() { toggleDetails(this); };
+                    alertDiv.innerHTML = `ALERT ${alert.id} <i class="fas fa-chevron-down"></i>
+                        <div class="alert-details">${alert.message}</div>`;
+                    alertsDiv.appendChild(alertDiv);
+                });
+
+                // Update graph
+                pestGraph.data.datasets[0].data = [
+                    data.pest_counts[1] || 0,
+                    data.pest_counts[2] || 0,
+                    data.pest_counts[3] || 0,
+                    data.pest_counts[4] || 0,
+                    data.pest_counts[5] || 0,
+                    data.pest_counts[6] || 0
+                ];
+                pestGraph.update();
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>

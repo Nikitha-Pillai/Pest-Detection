@@ -1,0 +1,28 @@
+# Virtual environment
+venv/
+
+# SQLite database
+pest_detection.db
+
+# PyTorch model file (large binary file)
+C4pest_detector_final.pth
+
+# Uploaded images
+static/uploads/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# macOS system files
+.DS_Store
+
+# Windows system files
+Thumbs.db
+Desktop.ini
+
+# Editor/IDE files
+.vscode/
+.idea/
