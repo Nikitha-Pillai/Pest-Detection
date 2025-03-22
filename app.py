@@ -1,6 +1,6 @@
 # app.py
 import sqlite3
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import torch
 import numpy as np
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
@@ -12,17 +12,27 @@ import base64
 from io import BytesIO
 
 app = Flask(__name__)
+app.secret_key = "your_secret_key_here"  # Required for session management
 
-# Database setup
+# Database setup for pest detections and users
 def init_db():
     conn = sqlite3.connect('pest_detection.db')
     c = conn.cursor()
+    # Table for pest detections
     c.execute('''CREATE TABLE IF NOT EXISTS pest_detections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         image BLOB NOT NULL,
         pest_id INTEGER,
         pest_name TEXT,
         detection_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )''')
+    # Table for users
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        mobile TEXT NOT NULL,
+        username TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL
     )''')
     conn.commit()
     conn.close()
@@ -41,13 +51,23 @@ class_names = {
 }
 
 # Load the trained model
-model = fasterrcnn_resnet50_fpn(weights=None)
-num_classes = 7
-in_features = model.roi_heads.box_predictor.cls_score.in_features
-model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-model_path = "D:/pest_detection_app/C4pest_detector_best.pth"
-model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
-model.eval()
+try:
+    model = fasterrcnn_resnet50_fpn(weights=None)
+    num_classes = 7
+    in_features = model.roi_heads.box_predictor.cls_score.in_features
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    model_path = "D:/pest_detection_app/C4pest_detector_best.pth"
+    print("Current working directory:", os.getcwd())
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found at {model_path}. Please ensure the file exists.")
+    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+    model.eval()
+except FileNotFoundError as e:
+    print(f"Error: {e}")
+    exit(1)
+except Exception as e:
+    print(f"Error loading model: {e}")
+    exit(1)
 
 # Image preprocessing
 transform = T.Compose([
@@ -78,7 +98,6 @@ def get_pest_counts():
     counts = {}
     for pest_id, count in c.fetchall():
         if isinstance(pest_id, bytes):
-            # Convert bytes to integer (little-endian)
             pest_id = int.from_bytes(pest_id, byteorder='little')
         counts[pest_id] = count
     conn.close()
@@ -93,16 +112,70 @@ def get_alerts():
     conn.close()
     return alerts
 
-# Route for the main page
+# Route for the main page (protected)
 @app.route('/')
 def index():
+    if 'username' not in session:
+        return redirect(url_for('login'))
     pest_counts = get_pest_counts()
     alerts = get_alerts()
     return render_template('index.html', alerts=alerts, pest_counts=pest_counts)
 
+# Route for login page
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        conn = sqlite3.connect('pest_detection.db')
+        c = conn.cursor()
+        c.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password))
+        user = c.fetchone()
+        conn.close()
+        
+        if user:
+            session['username'] = username
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', error="Invalid username or password")
+    
+    return render_template('login.html', error=None)
+
+# Route for sign-up page
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        name = request.form['name']
+        mobile = request.form['mobile']
+        username = request.form['username']
+        password = request.form['password']
+        
+        try:
+            conn = sqlite3.connect('pest_detection.db')
+            c = conn.cursor()
+            c.execute('INSERT INTO users (name, mobile, username, password) VALUES (?, ?, ?, ?)',
+                      (name, mobile, username, password))
+            conn.commit()
+            conn.close()
+            return redirect(url_for('login'))
+        except sqlite3.IntegrityError:
+            return render_template('signup.html', error="Username already exists")
+    
+    return render_template('signup.html', error=None)
+
+# Route for logout
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
+
 # Route to handle image uploads and pest detection
 @app.route('/upload', methods=['POST'])
 def upload_image():
+    if 'username' not in session:
+        return jsonify({'error': 'Please log in to upload images'}), 401
+    
     if 'image' not in request.files:
         return jsonify({'error': 'No image uploaded'}), 400
     
@@ -121,7 +194,6 @@ def upload_image():
     conn = sqlite3.connect('pest_detection.db')
     c = conn.cursor()
     for pest_id in detected_pests:
-        # Ensure pest_id is a Python integer
         pest_id = int(pest_id)
         print(f"Inserting pest_id: {pest_id}, type: {type(pest_id)}")  # Debug print
         pest_name = class_names.get(pest_id, "Unknown Pest")

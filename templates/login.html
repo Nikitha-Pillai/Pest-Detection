@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Pest Detection Dashboard</title>
+    <!-- Import Google Fonts for a modern look -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            /* Use the provided background image */
+            background-image: url('https://cdn.pixabay.com/photo/2020/09/15/15/56/background-5574027_1280.png'); /* Adjust the path as needed */
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .login-container {
+            background-color: rgba(255, 255, 255, 0.95); /* Slightly transparent white for better contrast */
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 40px;
+            width: 400px; /* Increased width for a larger box */
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+        }
+        .login-container h2 {
+            margin-bottom: 30px; /* Increased spacing below the heading */
+            color: #2e7d32;
+            font-size: 28px; /* Larger heading */
+            font-weight: 600;
+        }
+        .login-container input {
+            width: 100%;
+            padding: 12px; /* Increased padding for larger input fields */
+            margin-bottom: 20px; /* Increased spacing between fields */
+            border: 1px solid #ccc;
+            border-radius: 8px; /* More rounded corners */
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s ease;
+        }
+        .login-container input:focus {
+            border-color: #2e7d32;
+            outline: none;
+            box-shadow: 0 0 5px rgba(46, 125, 50, 0.3);
+        }
+        .login-container button {
+            background-color: #2e7d32;
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+        .login-container button:hover {
+            background-color: #1b5e20;
+        }
+        .signup-link {
+            margin-top: 20px; /* Increased spacing above the sign-up link */
+            font-size: 14px;
+        }
+        .signup-link a {
+            color: #2e7d32;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .signup-link a:hover {
+            text-decoration: underline;
+            color: #1b5e20;
+        }
+        .error {
+            color: #d32f2f;
+            margin-bottom: 20px; /* Increased spacing below the error message */
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>Login</h2>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="POST" action="{{ url_for('login') }}">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <div class="signup-link">
+            If not registered, <a href="{{ url_for('signup') }}">sign up</a>
+        </div>
+    </div>
+</body>
+</html>
