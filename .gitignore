@@ -4,8 +4,8 @@ venv/
 # SQLite database
 pest_detection.db
 
-# PyTorch model file (large binary file)
-C4pest_detector_final.pth
+# PyTorch model files (large binary files)
+*.pth
 
 # Uploaded images
 static/uploads/
