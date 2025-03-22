@@ -1,4 +1,3 @@
-# app.py
 import sqlite3
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import torch
@@ -12,7 +11,7 @@ import base64
 from io import BytesIO
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key_here"  # Required for session management
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24).hex())  # Secure secret key
 
 # Database setup for pest detections and users
 def init_db():
@@ -21,10 +20,12 @@ def init_db():
     # Table for pest detections
     c.execute('''CREATE TABLE IF NOT EXISTS pest_detections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
         image BLOB NOT NULL,
         pest_id INTEGER,
         pest_name TEXT,
-        detection_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        detection_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
     # Table for users
     c.execute('''CREATE TABLE IF NOT EXISTS users (
@@ -90,11 +91,11 @@ def detect_pests(image):
     
     return detected_pests
 
-# Function to get pest counts from the database
-def get_pest_counts():
+# Function to get pest counts from the database for a specific user
+def get_pest_counts(user_id):
     conn = sqlite3.connect('pest_detection.db')
     c = conn.cursor()
-    c.execute('SELECT pest_id, COUNT(*) FROM pest_detections GROUP BY pest_id')
+    c.execute('SELECT pest_id, COUNT(*) FROM pest_detections WHERE user_id = ? GROUP BY pest_id', (user_id,))
     counts = {}
     for pest_id, count in c.fetchall():
         if isinstance(pest_id, bytes):
@@ -103,11 +104,11 @@ def get_pest_counts():
     conn.close()
     return counts
 
-# Function to get recent alerts from the database
-def get_alerts():
+# Function to get recent alerts from the database for a specific user
+def get_alerts(user_id):
     conn = sqlite3.connect('pest_detection.db')
     c = conn.cursor()
-    c.execute('SELECT id, pest_name FROM pest_detections ORDER BY detection_time DESC LIMIT 5')
+    c.execute('SELECT id, pest_name FROM pest_detections WHERE user_id = ? ORDER BY detection_time DESC LIMIT 5', (user_id,))
     alerts = [{'id': row[0], 'message': f"Your field is infested by {row[1]}"} for row in c.fetchall()]
     conn.close()
     return alerts
@@ -117,8 +118,22 @@ def get_alerts():
 def index():
     if 'username' not in session:
         return redirect(url_for('login'))
-    pest_counts = get_pest_counts()
-    alerts = get_alerts()
+    
+    # Get the user_id of the logged-in user
+    username = session['username']
+    conn = sqlite3.connect('pest_detection.db')
+    c = conn.cursor()
+    c.execute('SELECT id FROM users WHERE username = ?', (username,))
+    user = c.fetchone()
+    conn.close()
+    
+    if not user:
+        session.pop('username', None)
+        return redirect(url_for('login'))
+    
+    user_id = user[0]
+    pest_counts = get_pest_counts(user_id)
+    alerts = get_alerts(user_id)
     return render_template('index.html', alerts=alerts, pest_counts=pest_counts)
 
 # Route for login page
@@ -187,24 +202,33 @@ def upload_image():
     image_pil.save(buffered, format="JPEG")
     image_binary = buffered.getvalue()
     
+    # Get the user_id of the logged-in user
+    username = session['username']
+    conn = sqlite3.connect('pest_detection.db')
+    c = conn.cursor()
+    c.execute('SELECT id FROM users WHERE username = ?', (username,))
+    user = c.fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'error': 'User not found'}), 400
+    user_id = user[0]
+    
     # Detect pests
     detected_pests = detect_pests(image_pil)
     
-    # Store results in the database
-    conn = sqlite3.connect('pest_detection.db')
-    c = conn.cursor()
+    # Store results in the database with user_id
     for pest_id in detected_pests:
         pest_id = int(pest_id)
         print(f"Inserting pest_id: {pest_id}, type: {type(pest_id)}")  # Debug print
         pest_name = class_names.get(pest_id, "Unknown Pest")
-        c.execute('INSERT INTO pest_detections (image, pest_id, pest_name) VALUES (?, ?, ?)',
-                  (image_binary, pest_id, pest_name))
+        c.execute('INSERT INTO pest_detections (user_id, image, pest_id, pest_name) VALUES (?, ?, ?, ?)',
+                  (user_id, image_binary, pest_id, pest_name))
     conn.commit()
     conn.close()
     
-    # Fetch updated data
-    pest_counts = get_pest_counts()
-    alerts = get_alerts()
+    # Fetch updated data for the current user
+    pest_counts = get_pest_counts(user_id)
+    alerts = get_alerts(user_id)
     
     return jsonify({'alerts': alerts, 'pest_counts': pest_counts})
 
