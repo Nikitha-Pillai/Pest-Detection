@@ -1,6 +1,9 @@
 # Virtual environment
 venv/
-
+*.db
+*.pth
+exported_images/
+.env
 # SQLite database
 pest_detection.db
 
