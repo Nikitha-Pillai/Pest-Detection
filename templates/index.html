@@ -119,12 +119,16 @@
     <div class="container">
         <div class="alerts">
             <h2>Alerts</h2>
-            {% for alert in alerts %}
-            <div class="alert" onclick="toggleDetails(this)">
-                ALERT {{ alert.id }} <i class="fas fa-chevron-down"></i>
-                <div class="alert-details">{{ alert.message }}</div>
-            </div>
-            {% endfor %}
+            {% if alerts|length == 0 %}
+                <p>No recent alerts.</p>
+            {% else %}
+                {% for alert in alerts %}
+                <div class="alert" onclick="toggleDetails(this)">
+                    ALERT {{ loop.index }} <i class="fas fa-chevron-down"></i>
+                    <div class="alert-details">{{ alert.message }}</div>
+                </div>
+                {% endfor %}
+            {% endif %}
         </div>
         <div class="main-content">
             <div class="welcome">Welcome Mr. Farmer</div>
@@ -133,8 +137,10 @@
                 <canvas id="pestGraph"></canvas>
             </div>
             <div class="upload-section">
-                <input type="file" id="imageUpload" accept="image/*">
-                <button onclick="uploadImage()">Upload Image</button>
+                <form id="uploadForm" enctype="multipart/form-data" method="POST" action="{{ url_for('upload_image') }}">
+                    <input type="file" id="imageUpload" name="image" accept="image/*">
+                    <button type="submit">Upload Image</button>
+                </form>
             </div>
         </div>
     </div>
@@ -175,54 +181,6 @@
         function toggleDetails(element) {
             const details = element.querySelector('.alert-details');
             details.style.display = details.style.display === 'block' ? 'none' : 'block';
-        }
-
-        // Upload image and update UI
-        function uploadImage() {
-            const fileInput = document.getElementById('imageUpload');
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('Please select an image to upload.');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('image', file);
-
-            fetch('/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                // Update alerts
-                const alertsDiv = document.querySelector('.alerts');
-                alertsDiv.innerHTML = '<h2>Alerts</h2>';
-                data.alerts.forEach(alert => {
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert';
-                    alertDiv.onclick = function() { toggleDetails(this); };
-                    alertDiv.innerHTML = `ALERT ${alert.id} <i class="fas fa-chevron-down"></i>
-                        <div class="alert-details">${alert.message}</div>`;
-                    alertsDiv.appendChild(alertDiv);
-                });
-
-                // Update graph
-                pestGraph.data.datasets[0].data = [
-                    data.pest_counts[1] || 0,
-                    data.pest_counts[2] || 0,
-                    data.pest_counts[3] || 0,
-                    data.pest_counts[4] || 0,
-                    data.pest_counts[5] || 0,
-                    data.pest_counts[6] || 0
-                ];
-                pestGraph.update();
-            })
-            .catch(error => console.error('Error:', error));
         }
     </script>
 </body>
