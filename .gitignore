@@ -4,6 +4,7 @@ venv/
 *.pth
 exported_images/
 .env
+.json
 # SQLite database
 pest_detection.db
 
