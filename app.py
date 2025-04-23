@@ -31,7 +31,7 @@ class_names = {
     2: "black cut worm",
     3: "grub",
     4: "mole cricket",
-    5: "peach borer",
+    5: "yellow peach moth",
     6: "red spider mite"
 }
 
